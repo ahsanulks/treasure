@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"reflect"
+	"time"
 )
 
 /*
@@ -26,10 +28,20 @@ x == 1 && y == 4
 ########
 */
 
+// type Move byte
+
+// const (
+// 	Up Move = iota
+// 	Right
+// 	Down
+// )
+
 var (
 	// position always y, x
-	playerPosition   = make(map[int]map[int]bool)
-	obstaclePosition = map[int]map[int]bool{
+	playerPosition     = make(map[int]map[int]bool)
+	treeWayPosition    = make(map[int]map[int]bool)
+	alreadyUsedTreeWay = make(map[int]map[int]bool)
+	obstaclePosition   = map[int]map[int]bool{
 		2: {
 			2: true,
 			3: true,
@@ -45,6 +57,7 @@ var (
 	}
 	arena                    [][]string
 	probablyTreasurePosition [][]int
+	movedPoint               = make(map[int]map[int]bool)
 )
 
 func main() {
@@ -53,6 +66,8 @@ func main() {
 	printArena()
 	searchTreasure()
 	fmt.Println(probablyTreasurePosition)
+	setArenaWithAllProbablyTreasurePlace()
+	printArena()
 }
 
 func makeArena() {
@@ -89,6 +104,7 @@ func isObstacle(y, x int) bool {
 
 func setStartPlayerPosition() {
 	setPlayerPosition(4, 1)
+	setMovedWay(4, 1)
 }
 
 func setPlayerPosition(y, x int) {
@@ -104,35 +120,50 @@ func setPlayerPosition(y, x int) {
 	1. up
 	2. right
 	3. down
+
+	if player found tree way position,
+	player will priority move to the current move order
 */
 func searchTreasure() {
-	var (
-		alreadyMoveUp    = false
-		alreadyMoveRight = false
-	)
-	for i := 0; i < 4; i++ {
-		if !alreadyMoveUp {
+	for {
+		time.Sleep(1 * time.Second)
+		if canMoveUp() {
 			fmt.Println("player move up")
 			movePlayerUp()
-			alreadyMoveUp = true
-		} else if !alreadyMoveRight {
+			if canMoveUp() && canMoveRight() {
+				setTreeWayPosition()
+			}
+			printArena()
+		} else if canMoveRight() {
 			fmt.Println("player move right")
 			movePlayerRight()
-			if canMoveDown() {
-				alreadyMoveRight = true
+			if canMoveRight() && canMoveDown() {
+				setTreeWayPosition()
 			}
-		} else {
+			printArena()
+		} else if canMoveDown() {
 			fmt.Println("player move down")
 			movePlayerDown()
 			setProbablyTreasurePosition()
+			printArena()
+			if canMoveDown() {
+				continue
+			} else {
+				if reflect.DeepEqual(treeWayPosition, alreadyUsedTreeWay) {
+					break
+				}
+				resetPlayerFromTreeWayPosition()
+				time.Sleep(1 * time.Second)
+				printArena()
+			}
 		}
-		printArena()
 	}
 }
 
 func movePlayerUp() {
 	y, x := getCurrentPlayerPosition()
 	setPlayerPosition(y-1, x)
+	setMovedWay(y-1, x)
 	arena[y-1][x] = "X"
 	arena[y][x] = "."
 }
@@ -140,6 +171,7 @@ func movePlayerUp() {
 func movePlayerRight() {
 	y, x := getCurrentPlayerPosition()
 	setPlayerPosition(y, x+1)
+	setMovedWay(y, x+1)
 	arena[y][x+1] = "X"
 	arena[y][x] = "."
 }
@@ -147,12 +179,32 @@ func movePlayerRight() {
 func movePlayerDown() {
 	y, x := getCurrentPlayerPosition()
 	setPlayerPosition(y+1, x)
+	setMovedWay(y+1, x)
 	arena[y+1][x] = "X"
 	arena[y][x] = "."
 }
 
+func canMoveUp() bool {
+	y, x := getCurrentPlayerPosition()
+	if alreadyMovedThisWay(y-1, x) {
+		return false
+	}
+	return !isObstacle(y-1, x)
+}
+
+func canMoveRight() bool {
+	y, x := getCurrentPlayerPosition()
+	if alreadyMovedThisWay(y, x+1) {
+		return false
+	}
+	return !isObstacle(y, x+1)
+}
+
 func canMoveDown() bool {
 	y, x := getCurrentPlayerPosition()
+	if alreadyMovedThisWay(y+1, x) {
+		return false
+	}
 	return !isObstacle(y+1, x)
 }
 
@@ -169,5 +221,89 @@ func getCurrentPlayerPosition() (y, x int) {
 
 func setProbablyTreasurePosition() {
 	y, x := getCurrentPlayerPosition()
+	fmt.Println("player probably found the treasure")
 	probablyTreasurePosition = append(probablyTreasurePosition, []int{y, x})
+}
+
+func setTreeWayPosition() {
+	y, x := getCurrentPlayerPosition()
+	if _, ok := treeWayPosition[y]; !ok {
+		treeWayPosition[y] = map[int]bool{
+			x: false,
+		}
+	} else {
+		treeWayPosition[y][x] = false
+	}
+}
+
+func fromTreeWay() bool {
+	y, x := getCurrentPlayerPosition()
+	if _, ok := treeWayPosition[y]; !ok {
+		return false
+	}
+	return treeWayPosition[y][x]
+}
+
+func resetPlayerFromTreeWayPosition() {
+	var x, y int
+	counter := 0
+Loop:
+	for yPosition, value := range treeWayPosition {
+		for xPosition := range value {
+			counter++
+			if alreadyUseTreeWay(yPosition, xPosition) {
+				continue
+			}
+			x = xPosition
+			y = yPosition
+			setUsedTreeWay(y, x)
+			break Loop
+		}
+	}
+	treeWayPosition[y][x] = true
+	fmt.Println("reset from tree way position")
+	currentYPosition, currentXPositon := getCurrentPlayerPosition()
+	setPlayerPosition(y, x)
+	arena[y][x] = "X"
+	arena[currentYPosition][currentXPositon] = "."
+}
+
+func setUsedTreeWay(y, x int) {
+	if _, ok := alreadyUsedTreeWay[y]; !ok {
+		alreadyUsedTreeWay[y] = map[int]bool{
+			x: true,
+		}
+		return
+	}
+	alreadyUsedTreeWay[y][x] = true
+}
+
+func alreadyUseTreeWay(y, x int) bool {
+	if _, ok := alreadyUsedTreeWay[y]; !ok {
+		return false
+	}
+	return alreadyUsedTreeWay[y][x]
+}
+
+func setMovedWay(y, x int) {
+	if _, ok := movedPoint[y]; !ok {
+		movedPoint[y] = map[int]bool{
+			x: true,
+		}
+		return
+	}
+	movedPoint[y][x] = true
+}
+
+func alreadyMovedThisWay(y, x int) bool {
+	if _, ok := movedPoint[y]; !ok {
+		return false
+	}
+	return movedPoint[y][x]
+}
+
+func setArenaWithAllProbablyTreasurePlace() {
+	for _, treasurePoint := range probablyTreasurePosition {
+		arena[treasurePoint[0]][treasurePoint[1]] = "$"
+	}
 }
