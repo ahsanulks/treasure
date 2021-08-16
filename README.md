@@ -25,9 +25,9 @@ X = represent player position
 ## Rule
 
 From the starting position, the user must navigate in a specific order:
-a. Up/North A step(s), then
-b. Right/East B step(s), then
-c. Down/South C step(s).
+1. Up/North A step(s), then
+2. Right/East B step(s), then
+3. Down/South C step(s).
 
 ## Strategy
 
