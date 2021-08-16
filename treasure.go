@@ -55,7 +55,7 @@ var (
 			2: true,
 		},
 	}
-	map                    [][]string
+	arena                    [][]string
 	probablyTreasurePosition [][]int
 	movedPoint               = make(map[int]map[int]bool)
 )
@@ -68,7 +68,7 @@ func main() {
 	setArenaWithAllProbablyTreasurePlace()
 	fmt.Println()
 	for index, value := range probablyTreasurePosition {
-		fmt.Printf("%d place possible treasure is at point x: %d, y: %d\n", index+1, value[1]+1, value[0]+1)
+		fmt.Printf("%d place possible treasure is at point x: %d, y: %d\n", index+1, value[1], value[0])
 	}
 	fmt.Printf("\nthe map will be\n")
 	printArena()
